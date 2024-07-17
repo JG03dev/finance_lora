@@ -1,6 +1,0 @@
-[package]
-name = "finance_lora"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies]
