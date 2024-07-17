@@ -1,0 +1,14 @@
+[build]
+target = "index.html"
+public_url = "/"
+release = false
+
+
+[serve]
+port = 8080
+open = true
+watch = true
+
+[[copy]]
+source = "static"
+destination = "static"

@@ -3,12 +3,12 @@ use yew::platform::spawn_local;
 use gloo_net::http::Request;
 use serde::{Deserialize, Serialize};
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct ChatRequest {
     message: String,
 }
 
-#[derive(Serialize, Deserialize)]
+#[derive(Serialize, Deserialize, Debug)]
 struct ChatResponse {
     response: String,
 }
@@ -33,7 +33,7 @@ pub fn chatbot() -> Html {
             if e.key() == "Enter" {
                 let input_message = (*input_value).clone();
                 let mut new_messages = (*messages).clone();
-                new_messages.push(format!("You: {}", input_message));
+                new_messages.push(("user", input_message.clone()));
                 messages.set(new_messages.clone());
                 input_value.set(String::new());
 
@@ -42,7 +42,7 @@ pub fn chatbot() -> Html {
                     let request_body = ChatRequest {
                         message: input_message.clone(),
                     };
-                    match Request::post("http://localhost:8081/chat")
+                    match Request::post("http://127.0.0.1:8081/chat")
                         .json(&request_body)
                         .unwrap()
                         .send()
@@ -50,13 +50,13 @@ pub fn chatbot() -> Html {
                         Ok(response) => {
                             if let Ok(chat_response) = response.json::<ChatResponse>().await {
                                 let mut updated_messages = new_messages.clone();
-                                updated_messages.push(format!("Bot: {}", chat_response.response));
+                                updated_messages.push(("bot", chat_response.response));
                                 messages_clone.set(updated_messages);
                             }
                         }
                         Err(err) => {
                             let mut updated_messages = new_messages.clone();
-                            updated_messages.push(format!("Error: {}", err));
+                            updated_messages.push(("bot", format!("Error: {}", err)));
                             messages_clone.set(updated_messages);
                         }
                     }
@@ -65,21 +65,64 @@ pub fn chatbot() -> Html {
         })
     };
 
+    let onclick = {
+        let input_value = input_value.clone();
+        let messages = messages.clone();
+        Callback::from(move |_| {
+            let input_message = (*input_value).clone();
+            let mut new_messages = (*messages).clone();
+            new_messages.push(("user", input_message.clone()));
+            messages.set(new_messages.clone());
+            input_value.set(String::new());
+
+            let messages_clone = messages.clone();
+            spawn_local(async move {
+                let request_body = ChatRequest {
+                    message: input_message.clone(),
+                };
+                match Request::post("http://127.0.0.1:8081/chat")
+                    .json(&request_body)
+                    .unwrap()
+                    .send()
+                    .await {
+                    Ok(response) => {
+                        if let Ok(chat_response) = response.json::<ChatResponse>().await {
+                            let mut updated_messages = new_messages.clone();
+                            updated_messages.push(("bot", chat_response.response));
+                            messages_clone.set(updated_messages);
+                        }
+                    }
+                    Err(err) => {
+                        let mut updated_messages = new_messages.clone();
+                        updated_messages.push(("bot", format!("Error: {}", err)));
+                        messages_clone.set(updated_messages);
+                    }
+                }
+            });
+        })
+    };
+
     html! {
         <div class="chatbot-container">
+            <div class="header">
+                { "Chatbot" }
+            </div>
             <div class="messages">
-                { for (*messages).iter().map(|message| html! {
-                    <div class="message">{ message }</div>
+                { for (*messages).iter().map(|(sender, message)| html! {
+                    <div class={classes!("message", *sender)}>{ message }</div>
                 })}
             </div>
-            <input
-                class="message-input"
-                type="text"
-                value={(*input_value).clone()}
-                {oninput}
-                {onkeypress}
-                placeholder="Type your message and press Enter"
-            />
+            <div class="message-input-container">
+                <input
+                    class="message-input"
+                    type="text"
+                    value={(*input_value).clone()}
+                    {oninput}
+                    {onkeypress}
+                    placeholder="Type your message"
+                />
+                <button class="send-button" {onclick}>{ "Send" }</button>
+            </div>
         </div>
     }
 }
